@@ -7,6 +7,18 @@ const FeedbackSchema = new mongoose.Schema({
     feedback : {
         type: String,
         required: true
+    },
+    userID : {
+        type: String,
+        required: true
+    },
+    fname : {
+        type: String,
+        required: true
+    },
+    lname : {
+        type: String,
+        required: true
     }
 });
 
