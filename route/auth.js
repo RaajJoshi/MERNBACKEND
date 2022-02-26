@@ -148,8 +148,8 @@ router.post('/admnregtr', async (req, res) => {
 
 router.post('/facregtr', async (req, res) => {
 
-    const { fname, lname, userID, email, phone, password, cnfpasswd } = req.body;
-    if (!fname || !lname || !userID || !email || !phone || !password || !cnfpasswd) {
+    const { fname, lname, userID, email, phone, password, cnfpasswd,isIncharge } = req.body;
+    if (!fname || !lname || !userID || !email || !phone || !password || !cnfpasswd || !isIncharge) {
         return res.status(422).json({ error: 'plz, filled all data' });
     }
 
@@ -160,7 +160,7 @@ router.post('/facregtr', async (req, res) => {
         } else if (password != cnfpasswd) {
             return res.status(422).json({ error: 'Both password are different' });
         } else {
-            const newreg = new FaIf({ fname, lname, userID, email, phone, password, cnfpasswd });
+            const newreg = new FaIf({ fname, lname, userID, email, phone, password, cnfpasswd, isIncharge });
             const saveornot = await newreg.save();
             if (saveornot) {
                 res.status(201).json({ message: 'Registrated successfully' });

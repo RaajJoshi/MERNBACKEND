@@ -32,6 +32,10 @@ const facSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    isIncharge : {
+        type: String,
+        required: true
+    },
     tokens:[
         {
             token:{
