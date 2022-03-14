@@ -24,6 +24,10 @@ const AddInfoSchemaClass = new mongoose.Schema({
         type: String,
         required: true
     },
+    Inchargeclass : {
+        type: String,
+        required: true
+    },
     tokens:[
         {
             token:{

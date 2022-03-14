@@ -36,6 +36,14 @@ const facSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    lab : {
+        type: String,
+        required: false
+    },
+    classroom : {
+        type: String,
+        required: false
+    },
     tokens:[
         {
             token:{

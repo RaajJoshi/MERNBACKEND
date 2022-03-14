@@ -1,8 +1,14 @@
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs/dist/bcrypt');
 const express = require('express');
+const nodemailer = require('nodemailer');
 const router = express.Router();
+const rt = express();
 const authenticate = require('../middleware/authenticate');
+const bodyParser = require('body-parser');
+const path = require('path');
+const XLSX = require('xlsx');
+const multer = require('multer');
 
 require('../conn');
 const Regst = require('../schema/useSchema');
@@ -14,7 +20,7 @@ const FaIf = require('../schema/FacultySchema');
 const AddCmp = require('../schema/CompSchema');
 const Fdbk = require('../schema/FeedbackSchema');
 
-router.get('/aboutus', authenticate ,(req, res) => {
+router.get('/aboutus', authenticate, (req, res) => {
     res.send(req.rootUset);
 });
 
@@ -46,6 +52,106 @@ router.post('/reg',(req,res)=>{
 })
 */
 
+/* Send OTP*/
+
+// var email;
+
+// let transporter = nodemailer.createTransport({
+//     host: "smtp.gmail.com",
+//     port: 465,
+//     secure: true,
+//     service : 'Gmail',
+
+//     auth: {
+//       user: 'joshiraj282002@gmail.com',
+//       pass: 'Raj#2002',
+//     }
+
+// });
+
+// router.post('/send',function(req,res){
+//     email=req.body.email;
+
+//     // generate the otp
+//     var otp = Math.random();
+//     otp = otp * 1000000;
+//     otp = parseInt(otp);
+//     console.log(otp);
+
+//     // set otp in redis (with email as key) with expiration time(5 mins)
+//     client.setEx(req.body.email, 3000000, otp);
+
+
+//      // send mail with defined transport object
+//     var mailOptions={
+//        to: req.body.email,
+//        subject: "Otp for registration is: ",
+//        html: "<h3>OTP for account verification is </h3>"  + "<h1 style='font-weight:bold;'>" + otp +"</h1>" // html body
+//      };
+
+//      transporter.sendMail(mailOptions, (error, info) => {
+//         if (error) {
+//             return console.log(error);
+//         }
+//         console.log('Message sent: %s', info.messageId);   
+//         console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+
+//         res.render('otp');
+//     });
+// });
+
+
+
+// router.post('/send', function (req, res) {
+//     email = req.body.email;
+
+//     let transporter = nodemailer.createTransport({
+//         service: 'Gmail',
+
+//         auth: {
+//             user: 'joshiraj282002@gmail.com',
+//             pass: 'Raj#2002',
+//         }
+
+//     });
+
+//     // generate the otp
+//     var otp = Math.random();
+//     otp = otp * 1000000;
+//     otp = parseInt(otp);
+//     console.log(otp);
+
+//     // set otp in redis (with email as key) with expiration time(5 mins)
+//     //client.setEx(req.body.email, 3000000, otp);
+
+
+//     // send mail with defined transport object
+//     var mailOptions = {
+//         to: req.body.email,
+//         subject: "Otp for registration is: ",
+//         html: "<h3 style='font-weight:bold;'>OTP for account verification is </h3>" + "<h1 style='font-weight:bold;'>" + otp + "</h1>"
+//     };
+
+//     transporter.sendMail(mailOptions, (error, info) => {
+//         if (error) {
+//             return console.log(error);
+//         }
+//         console.log('Message sent: %s', info.messageId);
+//         console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+
+//         res.render('otp');
+//     });
+// });
+
+// router.post('/verify',function(req,res){
+//     if(req.body.otp == otp){
+//         res.send("Success");
+//     }else{
+//         res.send("Invalid OTP");
+//     }
+// });
+
+
 router.post('/regtr', async (req, res) => {
 
     const { fname, lname, userID, email, phone, password, cnfpasswd } = req.body;
@@ -54,8 +160,8 @@ router.post('/regtr', async (req, res) => {
     }
 
     try {
-        const userExist = await Regst.findOne({ email : email });
-        const userExistId = await Regst.findOne({ userID : userID });
+        const userExist = await Regst.findOne({ email: email });
+        const userExistId = await Regst.findOne({ userID: userID });
         if (userExist || userExistId) {
             return res.status(422).json({ error: 'Email already exist' });
         } else if (password != cnfpasswd) {
@@ -76,6 +182,44 @@ router.post('/regtr', async (req, res) => {
 
     //console.log(req.body); 
     //res.json({message:req.body});
+})
+
+rt.use(bodyParser.urlencoded({extended:false}));
+rt.set('view engine','ejs');
+rt.use(express.static(path.resolve(__dirname,'public')));
+
+
+var storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, "./public/uploads" + req.file.filename)
+    },
+    filename: function (req, file, cb) {
+      cb(null, file.originalname)
+    }
+  });
+  
+  var upload = multer({ storage: storage });
+
+  
+
+router.post('/addst', upload.single('excel'), (req, res) => {
+
+      //const dfile = req.file.filename;
+      var workbook =  XLSX.readFile(req.file.filename);
+      var sheet_namelist = workbook.SheetNames;
+      var x=0;
+      sheet_namelist.forEach(element => {
+          var xlData = XLSX.utils.sheet_to_json(workbook.Sheets[sheet_namelist[x]]);
+          Regst.insertMany(xlData,(err,data)=>{
+              if(err){
+                  console.log(err);
+              }else{
+                  console.log(data);
+              }
+          })
+          x++;
+      });
+
 })
 
 router.post('/usrlogin', async (req, res) => {
@@ -103,7 +247,7 @@ router.post('/usrlogin', async (req, res) => {
                     expires: new Date(Date.now() + 25892000000),
                     httpOnly: true
                 });
-                res.json([token,_id,userID,fname,lname]);
+                res.json([token, _id, userID, fname, lname]);
             }
         } else {
             res.status(400).json({ error: "signin error" });
@@ -148,7 +292,7 @@ router.post('/admnregtr', async (req, res) => {
 
 router.post('/facregtr', async (req, res) => {
 
-    const { fname, lname, userID, email, phone, password, cnfpasswd,isIncharge } = req.body;
+    const { fname, lname, userID, email, phone, password, cnfpasswd, isIncharge, lab, classroom } = req.body;
     if (!fname || !lname || !userID || !email || !phone || !password || !cnfpasswd || !isIncharge) {
         return res.status(422).json({ error: 'plz, filled all data' });
     }
@@ -160,7 +304,7 @@ router.post('/facregtr', async (req, res) => {
         } else if (password != cnfpasswd) {
             return res.status(422).json({ error: 'Both password are different' });
         } else {
-            const newreg = new FaIf({ fname, lname, userID, email, phone, password, cnfpasswd, isIncharge });
+            const newreg = new FaIf({ fname, lname, userID, email, phone, password, cnfpasswd, isIncharge, lab, classroom });
             const saveornot = await newreg.save();
             if (saveornot) {
                 res.status(201).json({ message: 'Registrated successfully' });
@@ -194,7 +338,7 @@ router.post('/admnlogin', async (req, res) => {
             if (!isMatch) {
                 res.status(400).json({ error: "signin error" });
             } else {
-                
+
                 const token = await userLogin.generateAuthToken();
                 const _id = await userLogin._id;
                 const userID = await userLogin.userID;
@@ -205,7 +349,7 @@ router.post('/admnlogin', async (req, res) => {
                     expires: new Date(Date.now() + 25892000000),
                     httpOnly: true
                 });
-                res.json([token,_id,userID,fname,lname]);
+                res.json([token, _id, userID, fname, lname]);
             }
         } else {
             res.status(400).json({ error: "signin error" });
@@ -234,18 +378,21 @@ router.post('/faclogin', async (req, res) => {
             if (!isMatch) {
                 res.status(400).json({ error: "signin error" });
             } else {
-                
+
                 const token = await userLogin.generateAuthToken();
                 const _id = await userLogin._id;
                 const userID = await userLogin.userID;
                 const fname = await userLogin.fname;
                 const lname = await userLogin.lname;
+                const isIncharge = await userLogin.isIncharge;
+                const lab = await userLogin.lab;
+                const classroom = await userLogin.classroom;
 
                 res.cookie("jwtoken", token, {
                     expires: new Date(Date.now() + 25892000000),
                     httpOnly: true
                 });
-                res.json([token,_id,userID,fname,lname]);
+                res.json([token, _id, userID, fname, lname, isIncharge, lab, classroom]);
             }
         } else {
             res.status(400).json({ error: "signin error" });
@@ -259,7 +406,7 @@ router.post('/faclogin', async (req, res) => {
 
 router.get("/readadmnbyid/:id", async (req, res) => {
     const uid = req.params.id;
-    AdIf.find({userID:uid}, (err, result) => {
+    AdIf.find({ userID: uid }, (err, result) => {
         if (err) {
             res.send(err);
         } else {
@@ -270,7 +417,7 @@ router.get("/readadmnbyid/:id", async (req, res) => {
 
 router.get("/readusrbyid/:id", async (req, res) => {
     const uid = req.params.id;
-    Regst.find({userID:uid}, (err, result) => {
+    Regst.find({ userID: uid }, (err, result) => {
         if (err) {
             res.send(err);
         } else {
@@ -281,7 +428,7 @@ router.get("/readusrbyid/:id", async (req, res) => {
 
 router.get("/readfacbyid/:id", async (req, res) => {
     const uid = req.params.id;
-    FaIf.find({userID:uid}, (err, result) => {
+    FaIf.find({ userID: uid }, (err, result) => {
         if (err) {
             res.send(err);
         } else {
@@ -292,17 +439,17 @@ router.get("/readfacbyid/:id", async (req, res) => {
 
 router.post('/addreso', async (req, res) => {
 
-    const { labno, pcno, chrno, acno, fanno, lightno, ethr, projc } = req.body;
-    if (!labno || !pcno || !chrno || !acno || !fanno || !lightno || !ethr || !projc) {
-        return res.status(422).json({ error: 'plz, filled all data' });
-    }
+    const { labno, pcno, chrno, acno, fanno, lightno, ethr, projc, projno, projnm1, projnm2, Incharge } = req.body;
+    // if (!labno || !pcno || !chrno || !acno || !fanno || !lightno || !ethr || !projc || !Incharge) {
+    //     return res.status(422).json({ error: 'plz, filled all data' });
+    // }
 
     try {
         const labExist = await AdRs.findOne({ labno: labno });
         if (labExist) {
             return res.status(422).json({ error: 'Lab already exist' });
         } else {
-            const newlab = new AdRs({ labno, pcno, chrno, acno, fanno, lightno, ethr, projc });
+            const newlab = new AdRs({ labno, pcno, chrno, acno, fanno, lightno, ethr, projc, projno, projnm1, projnm2, Incharge });
             const saveornot = await newlab.save();
             if (saveornot) {
                 res.status(201).json({ message: 'Add Resource Successfully' });
@@ -322,14 +469,14 @@ router.post('/addreso', async (req, res) => {
 
 router.post('/feedbackbe/:id', async (req, res) => {
     userID = req.params.id;
-    const { feedback,fname,lname } = req.body;
-    if ( !feedback ) {
+    const { feedback, fname, lname } = req.body;
+    if (!feedback) {
         return res.status(422).json({ error: 'plz, filled all data' });
     }
 
     try {
 
-        const newfdbk = new Fdbk({ feedback,userID,fname,lname });
+        const newfdbk = new Fdbk({ feedback, userID, fname, lname });
         const saveornot = await newfdbk.save();
         if (saveornot) {
             res.status(201).json({ message: 'Add Feedback Successfully' });
@@ -353,8 +500,8 @@ router.get("/readfeedback", async (req, res) => {
 
 router.post('/addresoclass', async (req, res) => {
 
-    const { classno, benchno, fannno, tubelightno, projec } = req.body;
-    if (!classno || !benchno || !fannno || !tubelightno || !projec) {
+    const { classno, benchno, fannno, tubelightno, projec, Inchargeclass } = req.body;
+    if (!classno || !benchno || !fannno || !tubelightno || !projec || !Inchargeclass) {
         return res.status(422).json({ error: 'plz, filled all data' });
     }
 
@@ -363,7 +510,7 @@ router.post('/addresoclass', async (req, res) => {
         if (labExist) {
             return res.status(422).json({ error: 'Classroom already exist' });
         } else {
-            const newlab = new AdRsCls({ classno, benchno, fannno, tubelightno, projec });
+            const newlab = new AdRsCls({ classno, benchno, fannno, tubelightno, projec, Inchargeclass });
             const saveornot = await newlab.save();
             if (saveornot) {
                 res.status(201).json({ message: 'Add Resource Successfully' });
@@ -403,9 +550,29 @@ router.get("/readlab", async (req, res) => {
         }
     })
 })
+router.get("/readlabbyid/:id", async (req, res) => {
+    const id = req.params.id;
+    AdRs.find({ labno: id }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
 
 router.get("/readclass", async (req, res) => {
     AdRsCls.find({}, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+router.get("/readclassbyid/:id", async (req, res) => {
+    const id = req.params.id;
+    AdRsCls.find({ classno: id }, (err, result) => {
         if (err) {
             res.send(err);
         } else {
@@ -568,15 +735,15 @@ router.put("/updateclassproj", async (req, res) => {
 
 router.post('/addcomp', async (req, res) => {
 
-    const { comptype, resno, eqtype, abeq, status, userID } = req.body;
+    const { comptype, resno, eqtype, abeq, eqno, status, userID, eid } = req.body;
     /*
     if (!comptype || !resno || !abeq || !status || !userID) {
         return res.status(422).json({ error: 'plz, filled all data' });
     }
     */
-
+    console.log(eid);
     try {
-        const newcomp = new AddCmp({ comptype, resno, eqtype, abeq, status, userID });
+        const newcomp = new AddCmp({ comptype, resno, eqtype, abeq, eqno, status, userID });
         const saveornot = await newcomp.save();
         if (saveornot) {
             res.status(201).json({ message: 'Add Complain Successfully' });
@@ -584,12 +751,37 @@ router.post('/addcomp', async (req, res) => {
             res.status(500).json({ error: 'Failed to Add Complain' });
         }
 
+        let transporter = nodemailer.createTransport({
+            service: 'Gmail',   
+            auth: {
+                user: 'joshiraj282002@gmail.com',
+                pass: 'Raj#2002',
+            }   
+        });
+        var mailOptions = {
+            to: eid,
+            subject: "About Complaint",
+            html: "<h3 style={{font-weight:'bold',color:'black'}}>One complaint raised about your Lab/Classroom</h3><br>" + 
+                    "<h4 style={{display:'inline',color:'black'}}>Complaint Type : " + comptype + "</h4>" +
+                    "<h4 style={{display:'inline',color:'black'}}>Resource no. : " + resno + "</h4>" +
+                    "<h4 style={{display:'inline',color:'black'}}>Equipment Type : " + eqtype + "</h4>" +
+                    "<h4 style={{display:'inline',color:'black'}}>Equipment no. : " + eqno + "</h4>" +
+                    "<h4 style={{display:'inline',color:'black'}}>Description : " + abeq + "</h4>" 
+        };   
+        transporter.sendMail(mailOptions, (error, info) => {
+            if (error) {
+                return console.log(error);
+            }
+            console.log('Message sent: %s', info.messageId);
+            console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
+    
+            res.render('eid');
+        });
+
     } catch (err) {
         console.log(err);
     }
 
-    //console.log(req.body); 
-    //res.json({message:req.body});
 })
 
 router.get("/readcomp", async (req, res) => {
@@ -602,9 +794,50 @@ router.get("/readcomp", async (req, res) => {
     })
 })
 
+router.get("/readcompno/:id", async (req, res) => {
+    const id = req.params.id;
+    AddCmp.find({ userID: id, status: 'pending' }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+router.get("/readcompnoinp/:id", async (req, res) => {
+    const id = req.params.id;
+    AddCmp.find({ userID: id, status: 'inprogress' }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+router.get("/readcompnounp/:id", async (req, res) => {
+    const id = req.params.id;
+    AddCmp.find({ userID: id, status: 'under process' }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+router.get("/readcompnocpt/:id", async (req, res) => {
+    const id = req.params.id;
+    AddCmp.find({ userID: id, status: 'completed' }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+
 router.get("/readcompbyid/:id", async (req, res) => {
     const id = req.params.id;
-    AddCmp.find({ userID:id,comptype:'lab' }, (err, result) => {
+    AddCmp.find({ userID: id }, (err, result) => {
         if (err) {
             res.send(err);
         } else {
@@ -615,7 +848,7 @@ router.get("/readcompbyid/:id", async (req, res) => {
 
 router.get("/readcompbyidclass/:id", async (req, res) => {
     const id = req.params.id;
-    AddCmp.find({ userID:id,comptype:'classroom' }, (err, result) => {
+    AddCmp.find({ userID: id, comptype: 'classroom' }, (err, result) => {
         if (err) {
             res.send(err);
         } else {
@@ -639,6 +872,27 @@ router.put("/updatecomp", async (req, res) => {
 
 router.get("/readcompinp", async (req, res) => {
     AddCmp.find({ status: 'inprogress' }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+
+router.get("/readcompinpbyres/:id", async (req, res) => {
+    const lab = req.params.id;
+    AddCmp.find({ resno: lab, status: 'inprogress' }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+
+router.get("/readcompup", async (req, res) => {
+    AddCmp.find({ status: 'under process' }, (err, result) => {
         if (err) {
             res.send(err);
         } else {

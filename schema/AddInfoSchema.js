@@ -35,6 +35,22 @@ const AddInfoSchema = new mongoose.Schema({
     projc : {
         type: String,
         required: true
+    },
+    projno : {
+        type: String,
+        required: false
+    },
+    projnm1 : {
+        type: String,
+        required: false
+    },
+    projnm2 : {
+        type: String,
+        required: false
+    },
+    Incharge : {
+        type: String,
+        required: true
     }
 });
 

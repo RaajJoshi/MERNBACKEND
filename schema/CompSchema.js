@@ -16,6 +16,10 @@ const CompSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    eqno : {
+        type: String,
+        required: false
+    },
     abeq : {
         type: String,
         required: true
