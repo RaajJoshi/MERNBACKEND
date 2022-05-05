@@ -19,6 +19,7 @@ const AdIf = require('../schema/admnSchema');
 const FaIf = require('../schema/FacultySchema');
 const AddCmp = require('../schema/CompSchema');
 const Fdbk = require('../schema/FeedbackSchema');
+const OtSc = require('../schema/OtpSchema');
 
 router.get('/aboutus', authenticate, (req, res) => {
     res.send(req.rootUset);
@@ -54,55 +55,7 @@ router.post('/reg',(req,res)=>{
 
 /* Send OTP*/
 
-// var email;
-
-// let transporter = nodemailer.createTransport({
-//     host: "smtp.gmail.com",
-//     port: 465,
-//     secure: true,
-//     service : 'Gmail',
-
-//     auth: {
-//       user: 'joshiraj282002@gmail.com',
-//       pass: 'Raj#2002',
-//     }
-
-// });
-
-// router.post('/send',function(req,res){
-//     email=req.body.email;
-
-//     // generate the otp
-//     var otp = Math.random();
-//     otp = otp * 1000000;
-//     otp = parseInt(otp);
-//     console.log(otp);
-
-//     // set otp in redis (with email as key) with expiration time(5 mins)
-//     client.setEx(req.body.email, 3000000, otp);
-
-
-//      // send mail with defined transport object
-//     var mailOptions={
-//        to: req.body.email,
-//        subject: "Otp for registration is: ",
-//        html: "<h3>OTP for account verification is </h3>"  + "<h1 style='font-weight:bold;'>" + otp +"</h1>" // html body
-//      };
-
-//      transporter.sendMail(mailOptions, (error, info) => {
-//         if (error) {
-//             return console.log(error);
-//         }
-//         console.log('Message sent: %s', info.messageId);   
-//         console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
-
-//         res.render('otp');
-//     });
-// });
-
-
-
-// router.post('/send', function (req, res) {
+// router.post('/send', async (req, res) => {
 //     email = req.body.email;
 
 //     let transporter = nodemailer.createTransport({
@@ -121,9 +74,13 @@ router.post('/reg',(req,res)=>{
 //     otp = parseInt(otp);
 //     console.log(otp);
 
-//     // set otp in redis (with email as key) with expiration time(5 mins)
-//     //client.setEx(req.body.email, 3000000, otp);
-
+//     const newotp = new OtSc({ email, otp });
+//     const saveornot = await newotp.save();
+//     if (saveornot) {
+//         res.status(201).json({ message: 'OTP saved successfully' });
+//     } else {
+//         res.status(500).json({ error: 'Failed to save OTP' });
+//     }
 
 //     // send mail with defined transport object
 //     var mailOptions = {
@@ -143,13 +100,57 @@ router.post('/reg',(req,res)=>{
 //     });
 // });
 
-// router.post('/verify',function(req,res){
-//     if(req.body.otp == otp){
-//         res.send("Success");
-//     }else{
-//         res.send("Invalid OTP");
+// router.post('/verify', async (req, res) => {
+//     try {
+//         const { email, otp } = req.body;
+
+//         const userLogin = await OtSc.findOne({ email: email });
+
+//         if (userLogin) {
+//             var isMatch = 0;
+//             if (otp === userLogin.otp) {
+//                 isMatch = 1;
+//             }
+
+
+//             if (isMatch === 0) {
+//                 res.status(400).json({ error: "OTP error" });
+//             } else {
+//                 const uemail = await userLogin.email;
+
+//                 res.status(201).json([uemail]);
+//             }
+//         } else {
+//             res.status(400).json({ error: "OTP error" });
+//         }
+
+//     } catch (err) {
+//         console.log(err);
 //     }
 // });
+
+// router.put("/updatepass", async (req, res) => {
+//     try {
+//         const email = req.body.email;
+//         req.body.pass = await bcrypt.hash(req.body.pass,12);
+//         req.body.cpass = await bcrypt.hash(req.body.cpass,12);
+//         const userLogin = await Regst.findOne({ email: email });
+//         if (userLogin) {
+//             userLogin.password = req.body.pass;
+//             console.log(userLogin.password);
+//             userLogin.cnfpasswd = req.body.cpass;
+//             const saveornot = await userLogin.save();
+
+//             if (saveornot) {
+//                 res.status(201).json({ message: 'Password successfully' });
+//             } else {
+//                 res.status(500).json({ error: 'Failed to save password' });
+//             }
+//         }
+//     } catch (err) {
+//         console.log(err);
+//     }
+// })
 
 
 router.post('/regtr', async (req, res) => {
@@ -184,42 +185,49 @@ router.post('/regtr', async (req, res) => {
     //res.json({message:req.body});
 })
 
-rt.use(bodyParser.urlencoded({extended:false}));
-rt.set('view engine','ejs');
-rt.use(express.static(path.resolve(__dirname,'public')));
-
 
 var storage = multer.diskStorage({
     destination: function (req, file, cb) {
-      cb(null, "./public/uploads" + req.file.filename)
+      cb(null, "./public/uploads");
     },
     filename: function (req, file, cb) {
-      cb(null, file.originalname)
-    }
+      cb(null, file.originalname);
+    },
   });
   
   var upload = multer({ storage: storage });
-
   
-
-router.post('/addst', upload.single('excel'), (req, res) => {
-
-      //const dfile = req.file.filename;
-      var workbook =  XLSX.readFile(req.file.filename);
-      var sheet_namelist = workbook.SheetNames;
-      var x=0;
-      sheet_namelist.forEach(element => {
-          var xlData = XLSX.utils.sheet_to_json(workbook.Sheets[sheet_namelist[x]]);
-          Regst.insertMany(xlData,(err,data)=>{
-              if(err){
-                  console.log(err);
-              }else{
-                  console.log(data);
-              }
-          })
-          x++;
+  rt.use(bodyParser.urlencoded({ extended: false }));
+  // rt.set("view engine", "ejs");
+  rt.use(express.static(path.resolve(__dirname, "public")));
+  
+  router.post("/addst", upload.single("stdata"), (req, res) => {
+    //const dfile = req.file.filename;
+    console.log(req.file);
+    var workbook = XLSX.readFile(req.file.path);
+    var sheet_namelist = workbook.SheetNames;
+    var x = 0;
+    sheet_namelist.forEach((element) => {
+      var xlData = XLSX.utils.sheet_to_json(workbook.Sheets[sheet_namelist[x]]);
+      Regst.insertMany(xlData, (err, data) => {
+        if (err) {
+          console.log(err);
+        } else {
+          console.log(data);
+        }
       });
+      x++;
+    });
+  });
 
+  router.get("/readstd", async (req, res) => {
+    Regst.find({}, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
 })
 
 router.post('/usrlogin', async (req, res) => {
@@ -230,9 +238,14 @@ router.post('/usrlogin', async (req, res) => {
         }
 
         const userLogin = await Regst.findOne({ userID: userID });
+        let isMatch = false;
 
         if (userLogin) {
-            const isMatch = await bcrypt.compare(password, userLogin.password);
+
+            if(userLogin.password === password){
+                isMatch = true;
+            }
+            //const isMatch = Buffer.compare(password, userLogin.password);
 
 
             if (!isMatch) {
@@ -752,29 +765,29 @@ router.post('/addcomp', async (req, res) => {
         }
 
         let transporter = nodemailer.createTransport({
-            service: 'Gmail',   
+            service: 'Gmail',
             auth: {
                 user: 'joshiraj282002@gmail.com',
                 pass: 'Raj#2002',
-            }   
+            }
         });
         var mailOptions = {
             to: eid,
             subject: "About Complaint",
-            html: "<h3 style={{font-weight:'bold',color:'black'}}>One complaint raised about your Lab/Classroom</h3><br>" + 
-                    "<h4 style={{display:'inline',color:'black'}}>Complaint Type : " + comptype + "</h4>" +
-                    "<h4 style={{display:'inline',color:'black'}}>Resource no. : " + resno + "</h4>" +
-                    "<h4 style={{display:'inline',color:'black'}}>Equipment Type : " + eqtype + "</h4>" +
-                    "<h4 style={{display:'inline',color:'black'}}>Equipment no. : " + eqno + "</h4>" +
-                    "<h4 style={{display:'inline',color:'black'}}>Description : " + abeq + "</h4>" 
-        };   
+            html: "<h3 style={{font-weight:'bold',color:'black'}}>One complaint raised about your Lab/Classroom</h3><br>" +
+                "<h4 style={{display:'inline',color:'black'}}>Complaint Type : " + comptype + "</h4>" +
+                "<h4 style={{display:'inline',color:'black'}}>Resource no. : " + resno + "</h4>" +
+                "<h4 style={{display:'inline',color:'black'}}>Equipment Type : " + eqtype + "</h4>" +
+                "<h4 style={{display:'inline',color:'black'}}>Equipment no. : " + eqno + "</h4>" +
+                "<h4 style={{display:'inline',color:'black'}}>Description : " + abeq + "</h4>"
+        };
         transporter.sendMail(mailOptions, (error, info) => {
             if (error) {
                 return console.log(error);
             }
             console.log('Message sent: %s', info.messageId);
             console.log('Preview URL: %s', nodemailer.getTestMessageUrl(info));
-    
+
             res.render('eid');
         });
 
@@ -880,9 +893,41 @@ router.get("/readcompinp", async (req, res) => {
     })
 })
 
-router.get("/readcompinpbyres/:id", async (req, res) => {
+router.get("/readcompinpbyresl/:id", async (req, res) => {
     const lab = req.params.id;
-    AddCmp.find({ resno: lab, status: 'inprogress' }, (err, result) => {
+    AddCmp.find({comptype: 'lab', resno: lab, status: 'inprogress' }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+router.get("/readcompinpbyresc/:id", async (req, res) => {
+    const lab = req.params.id;
+    AddCmp.find({comptype: 'classroom', resno: lab, status: 'inprogress' }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+router.get("/readcompinpbyresol/:id", async (req, res) => {
+    const lab = req.params.id;
+    
+    AddCmp.find({comptype: 'lab', resno: lab ,status: 'inprogress' }, (err, result) => {
+        if (err) {
+            res.send(err);
+        } else {
+            res.send(result);
+        }
+    })
+})
+router.get("/readcompinpbyresoc/:id", async (req, res) => {
+    const classroom = req.params.id;
+
+    AddCmp.find({comptype: 'classroom', resno: classroom ,status: 'inprogress' }, (err, result) => {
         if (err) {
             res.send(err);
         } else {
